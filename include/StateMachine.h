@@ -1,6 +1,8 @@
 #ifndef STATE_MACHINE_H
 #define STATE_MACHINE_H
 
+#include <stdbool.h>
+
 // --------------------------------------------------
 // Data types
 // --------------------------------------------------
@@ -61,7 +63,7 @@ bool SM_RegisterState(const char *name, void (*enterFn)(void *),
  * @return true if a state with the given name exists, false otherwise.
  * @author Vitor Betmann
  */
-bool SM_IsStateRegistered(char *name);
+bool SM_IsStateRegistered(const char *name);
 
 /**
  * @brief Switches to a different state by name, optionally passing arguments.
@@ -120,5 +122,19 @@ bool SM_Shutdown(void);
  * @author Vitor Betmann
  */
 const char *SM_GetCurrStateName(void);
+
+// --------------------------------------------------
+// Convenience macros
+// --------------------------------------------------
+
+/**
+ * @brief Switches to a different state by name without arguments.
+ * 
+ * This is a convenience macro for the common case where no arguments
+ * need to be passed to the enter function.
+ * 
+ * @param name The name of the state to switch to.
+ */
+#define SM_ChangeStateToSimple(name) SM_ChangeStateTo(name, NULL)
 
 #endif

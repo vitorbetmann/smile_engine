@@ -12,6 +12,13 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+// --------------------------------------------------
+
+// --------------------------------------------------
+static char* SM_Internal_TrimWhitespace(const char* str);
 
 // --------------------------------------------------
 // Defines
@@ -130,53 +137,48 @@ bool SM_RegisterState(const char *name, void (*enterFn)(void *),
   return true;
 }
 
-bool SM_IsStateRegistered(char *name) {
-  if (!tracker) {
-    SM_ERR("Can't find state. State Machine not initialized.");
-    return false;
-  }
-
-  StateMap *entry;
-  HASH_FIND_STR(tracker->stateMap, name, entry);
-  return entry;
+bool SM_IsStateRegistered(const char* name) {
+    if (!SM_IsInitialized()) return false;
+    if (name == NULL) return false;
+    // Trim whitespace from the input name
+    char* trimmed_name = SM_Internal_TrimWhitespace(name);
+    if (trimmed_name == NULL) return false;
+    State* state = (State*)SM_Internal_GetState(trimmed_name);
+    free(trimmed_name);
+    return (state != NULL);
 }
 
 bool SM_ChangeStateTo(const char *name, void *args) {
-
-  if (!tracker) {
-    SM_ERR("Can't change state. State Machine not initialized.");
-    return false;
-  }
-
-  if (!name) {
-    SM_ERR("Can't change to state with NULL name. Current state not changed.");
-    return false;
-  }
-
-  if (strlen(name) == 0) {
-    SM_ERR("Can't change to state with empty name. Current state not changed.");
-    return false;
-  }
-
-  State *nextState = (State *)SM_Internal_GetState(name);
-  if (!nextState) {
-    SM_WARN("Failed to find state '%s'. Current state not changed.", name);
-    return false;
-  }
-
-  State *currState = (State *)SM_Internal_GetCurrState();
-  if (currState && currState->exit) {
-    currState->exit();
-  }
-
-  SM_Internal_SetCurrState(nextState);
-
-  currState = (State *)SM_Internal_GetCurrState();
-  if (currState && currState->enter) {
-    currState->enter(args);
-  }
-
-  return true;
+    if (!SM_IsInitialized()) {
+        SM_ERR("Can't change state. State Machine not initialized.");
+        return false;
+    }
+    if (name == NULL) {
+        SM_ERR("Can't change to state with NULL name. Current state not changed.");
+        return false;
+    }
+    // Trim whitespace from the input name
+    char* trimmed_name = SM_Internal_TrimWhitespace(name);
+    if (trimmed_name == NULL) {
+        SM_ERR("Can't change to state with empty/whitespace-only name.");
+        return false;
+    }
+    // Use trimmed name for lookup
+    State* target_state = (State*)SM_Internal_GetState(trimmed_name);
+    free(trimmed_name);
+    if (target_state == NULL) {
+        SM_ERR("State '%s' not found.", name);
+        return false;
+    }
+    // Change state logic (not recursive)
+    if (tracker->currState && tracker->currState->exit) {
+        tracker->currState->exit();
+    }
+    SM_Internal_SetCurrState(target_state);
+    if (target_state->enter) {
+        target_state->enter(args);
+    }
+    return true;
 }
 
 bool SM_Update(float dt) {
@@ -297,6 +299,29 @@ const State *SM_Internal_GetState(const char *name) {
   StateMap *sm;
   HASH_FIND_STR(tracker->stateMap, name, sm);
   return sm ? sm->state : NULL;
+}
+
+// Helper function to trim whitespace from both ends
+static char* SM_Internal_TrimWhitespace(const char* str) {
+    if (str == NULL) return NULL;
+    // Skip leading whitespace
+    while (*str && (*str == ' ' || *str == '\t' || *str == '\n' || *str == '\r')) {
+        str++;
+    }
+    if (*str == '\0') return NULL; // Empty string after trimming
+    // Find end of string
+    const char* end = str + strlen(str) - 1;
+    // Skip trailing whitespace
+    while (end > str && (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r')) {
+        end--;
+    }
+    // Allocate memory for trimmed string
+    size_t len = end - str + 1;
+    char* trimmed = (char*)malloc(len + 1);
+    if (!trimmed) return NULL;
+    strncpy(trimmed, str, len);
+    trimmed[len] = '\0';
+    return trimmed;
 }
 
 // --------------------------------------------------
